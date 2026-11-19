@@ -71,6 +71,7 @@ class AppSettings:
     max_duration: int = 900         # seconds; 0 disables the upper bound
     concurrency: int = 2            # parallel downloads
     skip_existing: bool = True      # use a yt-dlp download archive
+    embed_thumbnail: bool = True    # put the video thumbnail into the MP3 as cover art
     last_category: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -78,8 +79,33 @@ class AppSettings:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
-        known = {f.name for f in fields(cls)}
-        return cls(**{k: v for k, v in data.items() if k in known})
+        """Build settings from JSON, ignoring unknown keys and bad values.
+
+        A hand-edited settings.json with e.g. ``"concurrency": "abc"`` must not
+        crash the app later on, so every value is coerced to the type of the
+        default and dropped if that fails.
+        """
+        defaults = cls()
+        values: dict[str, Any] = {}
+        for f in fields(cls):
+            if f.name not in data:
+                continue
+            default = getattr(defaults, f.name)
+            raw = data[f.name]
+            try:
+                if isinstance(default, bool):
+                    value = raw if isinstance(raw, bool) else str(raw).lower() in {"1", "true", "yes"}
+                elif isinstance(default, int):
+                    value = int(raw)
+                else:
+                    value = str(raw)
+            except (TypeError, ValueError):
+                continue
+            values[f.name] = value
+        settings = cls(**values)
+        if settings.bitrate not in BITRATES:
+            settings.bitrate = defaults.bitrate
+        return settings
 
 
 @dataclass
@@ -109,7 +135,8 @@ class ProgressEvent:
 
 @dataclass
 class DownloadSummary:
-    ok: int = 0
+    ok: int = 0                     # new MP3 files created
     failed: int = 0
-    skipped: int = 0
+    already_downloaded: int = 0     # skipped because they are in the archive
+    not_started: int = 0            # left over after the user cancelled
     failures: list[tuple[str, str]] = field(default_factory=list)

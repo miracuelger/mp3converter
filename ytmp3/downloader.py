@@ -8,7 +8,6 @@ and the queue continues.
 from __future__ import annotations
 
 import datetime as _dt
-import shutil
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -18,18 +17,19 @@ import yt_dlp
 
 from .config import FAILED_LOG, ensure_dirs, resolve_output_dir
 from .models import AppSettings, DownloadSummary, ProgressEvent, Track
+from .tools import base_options, find_ffmpeg
 
 EventSink = Callable[[ProgressEvent], None] | None
 
 ARCHIVE_NAME = "downloaded_archive.txt"
 
 
-class DownloadCancelled(Exception):
+class DownloadCancelled(yt_dlp.utils.DownloadCancelled):
     """Raised from inside a progress hook to stop the current download."""
 
 
 def ffmpeg_available() -> bool:
-    return shutil.which("ffmpeg") is not None
+    return find_ffmpeg() is not None
 
 
 def _emit(sink: EventSink, event: ProgressEvent) -> None:
@@ -46,6 +46,39 @@ def _log_failure(track: Track, reason: str) -> None:
             handle.write(line)
     except OSError:
         pass
+
+
+def read_archive(output_dir: Path) -> set[str]:
+    """Video ids recorded in the yt-dlp download archive of ``output_dir``."""
+    path = output_dir / ARCHIVE_NAME
+    ids: set[str] = set()
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[0] == "youtube":
+                ids.add(parts[1])
+    except OSError:
+        pass
+    return ids
+
+
+def _remove_leftovers(output_dir: Path, video_id: str) -> None:
+    """Delete .part files and intermediate audio/thumbnail files of a track.
+
+    Called after a failed or cancelled download. A finished .mp3 is kept.
+    """
+    marker = f"[{video_id}]"
+    try:
+        candidates = [p for p in output_dir.iterdir() if marker in p.name]
+    except OSError:
+        return
+    for path in candidates:
+        if path.suffix.lower() == ".mp3":
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            pass
 
 
 # Warnings that yt-dlp repeats for every single video and that the user can
@@ -75,12 +108,12 @@ class _TrackLogger:
         lowered = text.lower()
         if any(muted in lowered for muted in _MUTED_WARNINGS):
             return
-        _emit(self._sink, ProgressEvent(kind="log", message=f"Warnung: {text}"))
+        _emit(self._sink, ProgressEvent(kind="log", message=f"Warning: {text}"))
 
     def error(self, msg: str) -> None:
-        text = str(msg).strip()
-        if text:
-            _emit(self._sink, ProgressEvent(kind="log", message=f"Fehler: {text}"))
+        # Errors are raised as DownloadError as well and reported once by the
+        # caller together with the track title, so they are not logged here.
+        ...
 
 
 def build_options(
@@ -91,10 +124,26 @@ def build_options(
     logger: object | None = None,
 ) -> dict:
     """The yt-dlp options used for one download."""
+    postprocessors: list[dict] = []
+    if settings.embed_thumbnail:
+        # YouTube thumbnails are WebP; MP3 players only understand JPEG/PNG.
+        postprocessors.append(
+            {"key": "FFmpegThumbnailsConvertor", "format": "jpg", "when": "before_dl"})
+    postprocessors.append({
+        "key": "FFmpegExtractAudio",
+        "preferredcodec": "mp3",
+        "preferredquality": settings.bitrate,
+    })
+    postprocessors.append({"key": "FFmpegMetadata"})
+    if settings.embed_thumbnail:
+        postprocessors.append({"key": "EmbedThumbnail"})
+
     options: dict = {
+        **base_options(),
         "format": "bestaudio/best",
         # %(title).150s keeps very long titles inside the Windows path limit.
         "outtmpl": str(output_dir / "%(title).150s [%(id)s].%(ext)s"),
+        "windowsfilenames": True,    # same file names on every OS
         "noplaylist": True,
         "ignoreerrors": False,       # we handle errors per track ourselves
         "quiet": True,
@@ -102,16 +151,10 @@ def build_options(
         "noprogress": True,
         "retries": 3,
         "fragment_retries": 3,
+        "writethumbnail": settings.embed_thumbnail,
         "progress_hooks": list(hooks),
         "postprocessor_hooks": list(post_hooks),
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": settings.bitrate,
-            },
-            {"key": "FFmpegMetadata"},
-        ],
+        "postprocessors": postprocessors,
     }
     if logger is not None:
         options["logger"] = logger
@@ -138,25 +181,29 @@ def download_tracks(
 
     output_dir = resolve_output_dir(settings.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    archived = read_archive(output_dir) if settings.skip_existing else set()
 
     total = len(tracks)
     done = 0
     lock = threading.Lock()
 
-    def finish(track: Track, ok: bool, reason: str = "") -> None:
+    def finish(track: Track, status: str, reason: str = "") -> None:
+        """status is one of ok / failed / archived."""
         nonlocal done
         with lock:
             done += 1
-            if ok:
+            if status == "ok":
                 summary.ok += 1
+            elif status == "archived":
+                summary.already_downloaded += 1
             else:
                 summary.failed += 1
                 summary.failures.append((track.title, reason))
             current = done
-        if not ok:
+        if status == "failed":
             _log_failure(track, reason)
             _emit(on_event, ProgressEvent(
-                kind="log", message=f"Übersprungen: {track.title} ({reason})"))
+                kind="log", message=f"Skipped: {track.title} ({reason})"))
         _emit(on_event, ProgressEvent(
             kind="file_done",
             message=track.title,
@@ -168,6 +215,9 @@ def download_tracks(
     def worker(item: tuple[int, Track]) -> None:
         index, track = item
         if cancel is not None and cancel.is_set():
+            return
+        if track.video_id in archived:
+            finish(track, "archived")
             return
 
         _emit(on_event, ProgressEvent(
@@ -181,7 +231,7 @@ def download_tracks(
                 downloaded = data.get("downloaded_bytes") or 0
                 percent = (downloaded / total_bytes * 100) if total_bytes else 0.0
                 _emit(on_event, ProgressEvent(
-                    kind="file_progress", message=track.title, percent=percent))
+                    kind="file_progress", message=track.title, percent=min(percent, 100.0)))
 
         announced_post = False
 
@@ -208,15 +258,19 @@ def download_tracks(
             with yt_dlp.YoutubeDL(options) as ydl:
                 code = ydl.download([track.url])
             if code:
-                finish(track, False, f"yt-dlp Rückgabecode {code}")
+                _remove_leftovers(output_dir, track.video_id)
+                finish(track, "failed", f"yt-dlp exit code {code}")
             else:
-                finish(track, True)
+                finish(track, "ok")
         except DownloadCancelled:
+            _remove_leftovers(output_dir, track.video_id)
             return
         except yt_dlp.utils.DownloadError as exc:
-            finish(track, False, _short(exc))
+            _remove_leftovers(output_dir, track.video_id)
+            finish(track, "failed", _short(exc))
         except Exception as exc:  # noqa: BLE001 - never let one track kill the run
-            finish(track, False, f"{type(exc).__name__}: {exc}")
+            _remove_leftovers(output_dir, track.video_id)
+            finish(track, "failed", f"{type(exc).__name__}: {exc}")
 
     workers = max(1, min(settings.concurrency, 8))
     items = list(enumerate(tracks, start=1))
@@ -224,7 +278,7 @@ def download_tracks(
         list(pool.map(worker, items))
 
     if cancel is not None and cancel.is_set():
-        summary.skipped = total - summary.ok - summary.failed
+        summary.not_started = total - summary.ok - summary.failed - summary.already_downloaded
         _emit(on_event, ProgressEvent(kind="cancelled", payload=summary))
     else:
         _emit(on_event, ProgressEvent(kind="finished", payload=summary))
@@ -233,11 +287,22 @@ def download_tracks(
 
 def _short(exc: Exception, limit: int = 200) -> str:
     text = " ".join(str(exc).split())
+    if text.startswith("ERROR: "):
+        text = text[len("ERROR: "):]
     return text[:limit]
 
 
+def read_url_file(path: Path) -> list[str]:
+    """Non-empty, non-comment lines of a text file with one link per line."""
+    return [
+        line.strip()
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+
 def _cli() -> None:
-    """Quick test without the GUI:  python -m ytmp3.downloader urls.txt"""
+    """Download without the GUI:  python -m ytmp3.downloader urls.txt"""
     import sys
 
     from .config import load_settings
@@ -250,26 +315,32 @@ def _cli() -> None:
 
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("urls.txt")
     if not path.exists():
-        print(f"{path} nicht gefunden.")
+        print(f"{path} not found.")
         raise SystemExit(1)
 
-    lines = [
-        line.strip()
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.strip().startswith("#")
-    ]
-    tracks = []
-    for line in lines:
+    tracks: list[Track] = []
+    seen: set[str] = set()
+    for line in read_url_file(path):
         video_id = extract_video_id(line)
-        if video_id:
+        if video_id and video_id not in seen:
+            seen.add(video_id)
             tracks.append(Track(video_id=video_id, title=line))
+    if not tracks:
+        print(f"No YouTube links found in {path}.")
+        raise SystemExit(0)
+
+    settings = load_settings()
+    print(f"Downloading {len(tracks)} track(s) to {settings.output_dir} ...")
 
     def show(event: ProgressEvent) -> None:
-        if event.kind in {"file_start", "file_done", "log"}:
-            print(f"[{event.kind}] {event.message}")
+        if event.kind == "file_done":
+            print(f"[{event.current}/{event.total}] {event.message}")
+        elif event.kind == "log":
+            print(event.message)
 
-    summary = download_tracks(tracks, load_settings(), on_event=show)
-    print(f"\nFertig: {summary.ok} ok, {summary.failed} fehlgeschlagen.")
+    summary = download_tracks(tracks, settings, on_event=show)
+    print(f"\nDone: {summary.ok} new, {summary.already_downloaded} already downloaded, "
+          f"{summary.failed} failed.")
 
 
 if __name__ == "__main__":

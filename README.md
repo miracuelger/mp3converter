@@ -1,143 +1,181 @@
 # YouTube to MP3 Downloader
 
-Kategorie auswählen → 100–500 passende YouTube-Links werden automatisch
-gefunden → auswählen → als MP3 herunterladen.
+Pick a category → 100–500 matching YouTube links are found automatically →
+choose the ones you want → download them as MP3.
 
 | | |
 |---|---|
-| **Suchen** | Mehrere Suchbegriffe pro Kategorie, Duplikate und Live-Streams fliegen raus |
-| **Auswählen** | Alle Treffer in einer Tabelle mit Häkchen, Filter und Sortierung |
-| **Laden** | `yt-dlp` + FFmpeg, zwei Fortschrittsbalken, Fehler werden übersprungen statt abzubrechen |
+| **Search** | Several search terms per category; duplicates and live streams are filtered out |
+| **Choose** | All results in one table with check boxes, filter and sorting |
+| **Download** | `yt-dlp` + FFmpeg, MP3 with title, artist and cover art, two progress bars; failed videos are skipped instead of stopping the run |
 
 ---
 
-## Schnellstart
+## Installation
 
-```powershell
-python -m pip install -r requirements.txt   # einmalig
-python .\run_gui.py                         # starten
-```
+You only need **Python 3.10 or newer**. Everything else (yt-dlp, FFmpeg and
+Deno) is installed automatically on the first start.
 
-Zusätzlich nötig: **Python 3.10+** und **FFmpeg** im System-`PATH`.
+**Windows**
+1. Install Python from [python.org/downloads](https://www.python.org/downloads/)
+   using the default options.
+2. Double-click **`start-windows.bat`**.
+
+**macOS**
+1. Install Python from [python.org/downloads](https://www.python.org/downloads/macos/).
+2. Double-click **`start-macos.command`**. If macOS refuses to open it the
+   first time, right-click it → *Open*.
+
+**Linux**
+1. Python is usually already installed. On Debian/Ubuntu you may also need
+   `sudo apt install python3-tk python3-venv`.
+2. Run `./start.sh` in a terminal.
+
+The first start takes about a minute: it creates a private `.venv` folder
+inside the project and installs the components there. **Nothing is installed
+system-wide**, so deleting the project folder removes everything. Later starts
+open the app right away, and yt-dlp is updated once a week because YouTube
+changes often break older versions.
+
+> Developers can also run `python run_gui.py`, which does exactly the same as
+> the start scripts. `python run_gui.py --update` updates all components
+> right away.
 
 ---
 
-## Bedienung
+## How to use it
 
-**1 · Suchen**
-Kategorie im Dropdown wählen, gewünschte Anzahl Links einstellen, *Suchen*.
-Das Programm fragt die Suchbegriffe der Kategorie nacheinander ab, bis die
-Anzahl erreicht ist.
+**1 · Search**
+Pick a category from the drop-down (or type any search term into it), set
+the number of links you want and click *Search*. The app goes through the
+category's search terms until it has enough links.
 
-**2 · Auswählen**
-Was nicht gebraucht wird, wird abgewählt:
+**2 · Choose**
+Untick what you don't need:
 
-| Aktion | Wie |
+| Action | How |
 |---|---|
-| Einzelnen Titel an/aus | Klick auf das Häkchen |
-| Markierte Zeilen an/aus | `Leertaste` oder `Enter` |
-| Alle / Keine / Umkehren | Knöpfe unter der Tabelle |
-| Suchen in der Liste | Feld *Filter* — *Alle/Keine* wirken dann nur auf die gefilterten Zeilen |
-| Sortieren | Klick auf die Spaltenüberschrift |
-| Zeilen ganz entfernen | Markieren, dann *Entfernen* |
+| Tick/untick one track | Click the check box |
+| Tick/untick highlighted rows | `Space` or `Enter` |
+| All / None / Invert | Buttons below the table (or click the check box column header) |
+| Search the list | *Filter* field – *All/None* then only affect the filtered rows |
+| Sort | Click a column header |
+| Remove rows from the list | Highlight them, then *Remove* or `Delete` |
+| Listen to a track first | Double-click it – it opens in the web browser |
 
-**3 · Herunterladen**
-*Download starten*. Oben läuft die aktuelle Datei, darunter der
-Gesamtfortschritt. *Abbrechen* stoppt nach der laufenden Datei.
+**3 · Download**
+Click *Start download*. The top bar shows the current file, the bottom bar
+the overall progress. *Cancel* stops right away and removes half-finished
+files.
 
-> **Links aus Datei…** liest eine Textdatei mit einem Link pro Zeile ein
-> (z.B. die alte `urls.txt`) und hängt sie an die Liste an.
+> **Links from file…** reads a text file with one YouTube link per line and
+> adds the tracks to the list. **Paste links** does the same with links you
+> copied to the clipboard.
 
 ---
 
-## Einstellungen
+## Settings
 
-Werden automatisch in `config/settings.json` gespeichert.
+Saved automatically in `config/settings.json`.
 
-| Einstellung | Standard | Bedeutung |
+| Setting | Default | Meaning |
 |---|---|---|
-| Ordner | `mp3\` | Zielordner für die MP3-Dateien |
+| Folder | `mp3/` | Where the MP3 files are saved |
 | Bitrate | 192 | 128 / 192 / 256 / 320 kbps |
-| Länge min/max | 60 / 900 s | Filtert Shorts und stundenlange Mixe aus der Suche (0 = aus) |
-| Parallel | 2 | Gleichzeitige Downloads (1–8) — mehr als 3 provoziert Drosselung durch YouTube |
-| Bereits geladene überspringen | an | Führt `downloaded_archive.txt` im Zielordner, lädt nichts doppelt |
+| Length min/max | 60 / 900 sec | Removes shorts and hour-long mixes from search results (0 = off) |
+| Parallel | 2 | Simultaneous downloads (1–8) – more than 3 makes YouTube slow you down |
+| Skip already downloaded | on | Keeps `downloaded_archive.txt` in the output folder, so nothing is downloaded twice |
+| Cover art | on | Embeds the video thumbnail as album cover |
 
 ---
 
-## Eigene Kategorien
+## Your own categories
 
-Knopf **Kategorien…** → anlegen, umbenennen, löschen, Suchbegriffe bearbeiten
-(ein Begriff pro Zeile). Alles landet in `config/categories.json` und kann auch
-direkt dort bearbeitet werden:
+Click **Categories…** to create, rename or delete categories and edit their
+search terms (one per line). Everything is stored in `config/categories.json`,
+which you can also edit directly:
 
 ```json
 {
-  "Techno": ["techno 2025", "hard techno set", "melodic techno"],
+  "Techno": ["techno {year}", "hard techno set", "melodic techno"],
   "Arabesque": ["arabesk şarkılar", "müslüm gürses", "damar arabesk"]
 }
 ```
 
-**Faustregel:** 10–15 Suchbegriffe pro Kategorie für 500 Links. Das Ziel wird
-gleichmäßig auf die Begriffe verteilt; ist es früher erreicht, werden die
-restlichen Begriffe gar nicht mehr abgefragt.
+`{year}` and `{last_year}` are replaced with the current and the previous
+year, so search terms like "charts {year}" never go stale.
 
-Mitgeliefert sind 14 Kategorien: Pop · Party · Disco · Techno · House ·
-Turkish · Arabesque · Arabic · Balkan · Rap/HipHop · 80s/90s · Charts ·
-Schlager · Rock.
+**Rule of thumb:** 10–15 search terms per category for 500 links. The app
+asks for more results per search term when many of them are filtered out,
+and stops as soon as it has enough.
+
+14 categories are included: Pop · Party · Disco · Techno · House · Turkish ·
+Arabesque · Arabic · Balkan · Rap/HipHop · 80s/90s · Charts · Schlager · Rock.
 
 ---
 
-## Wenn etwas nicht klappt
+## Troubleshooting
 
-| Symptom | Ursache und Lösung |
+| Problem | Cause and fix |
 |---|---|
-| „FFmpeg wurde nicht im PATH gefunden" im Log | FFmpeg installieren, danach Terminal neu starten |
-| Viele Fehlschläge, HTTP 429 | *Parallel* auf 1–2 senken |
-| Nur stundenlange Mixe in der Liste | Maximale Länge senken, z.B. auf 600 s |
-| Weniger Treffer als gewünscht | Mehr Suchbegriffe in der Kategorie, oder Längenfilter lockern |
-| Ein Titel fehlt in den MP3s | `logs\failed.log` ansehen — dort steht Video-ID und Grund |
-| Nichts wird geladen, obwohl Titel ausgewählt sind | *Bereits geladene überspringen* ist an und die Videos stehen schon im Archiv |
-| Warnung „No supported JavaScript runtime" | Wird ausgefiltert. Falls Formate fehlen: `winget install DenoLand.Deno` |
+| The start script says Python was not found | Install Python 3.10+ (see *Installation*) and start again |
+| "tkinter is missing" | Linux: `sudo apt install python3-tk` (Debian/Ubuntu) |
+| Many failed downloads, HTTP 429 | Lower *Parallel* to 1–2 |
+| Many failed downloads after a while of working fine | YouTube changed something: run `python run_gui.py --update` |
+| Only hour-long mixes in the list | Lower the maximum length, e.g. to 600 sec |
+| Fewer results than requested | Add more search terms to the category, or relax the length filter |
+| A track is missing from the MP3s | See `logs/failed.log` – it lists the video id and the reason |
+| Nothing is downloaded although tracks are ticked | *Skip already downloaded* is on and the videos are already in the archive |
+| The app crashed or behaves strangely | See `logs/error.log` |
+| Something is completely broken | Delete the `.venv` folder and start again – the setup runs once more |
 
 ---
 
-## Projektstruktur
+## Project structure
 
 ```
-run_gui.py                 Einstiegspunkt der GUI
-youtube_to_mp3.py          altes Script, lädt weiterhin stumpf alle urls.txt-Links
+start-windows.bat          double-click start (Windows)
+start-macos.command        double-click start (macOS)
+start.sh                   start (Linux, also macOS)
+run_gui.py                 first-start setup + launch of the app
+youtube_to_mp3.py          downloads every link of urls.txt, no GUI
+requirements.txt           yt-dlp, imageio-ffmpeg (FFmpeg), deno
 config/
-  categories.json          Kategorien und ihre Suchbegriffe
-  settings.json            gespeicherte Einstellungen
-logs/failed.log            übersprungene Videos mit Grund
+  categories.json          categories and their search terms
+  settings.json            saved settings
+logs/
+  failed.log               skipped videos and the reason
+  error.log                unexpected errors
 ytmp3/
-  models.py                Datencontainer (Track, AppSettings, ProgressEvent)
-  config.py                Laden und Speichern der JSON-Dateien
-  search.py                Suche über ytsearchN:, Dedupe, Längenfilter
-  downloader.py            Download + MP3-Konvertierung, Fortschritt, Fehler
+  models.py                data containers (Track, AppSettings, ProgressEvent)
+  config.py                loading and saving the JSON files
+  tools.py                 finds FFmpeg and the JavaScript runtime
+  search.py                search via ytsearchN:, dedupe, length filter
+  downloader.py            download + MP3 conversion, progress, errors
   gui/
-    app.py                 Hauptfenster, Thread-Anbindung
-    results_view.py        Ergebnistabelle mit Häkchen-Spalte
-    category_editor.py     Kategorie-Editor
+    app.py                 main window, thread handling
+    results_view.py        result table with check box column
+    category_editor.py     category editor
 ```
 
-Such- und Downloadmodul laufen auch ohne GUI:
+Search and download also work without the GUI (run them with the Python in
+`.venv`, e.g. `.venv/bin/python` or `.venv\Scripts\python.exe`):
 
-```powershell
-python -m ytmp3.search Techno 50      # Kategorie oder freier Suchbegriff
-python -m ytmp3.downloader urls.txt   # Datei mit Links herunterladen
+```sh
+python -m ytmp3.search Techno 50      # category or any search term
+python -m ytmp3.downloader urls.txt   # download a file of links
 ```
 
-**Für Weiterentwicklung wichtig:** Suche und Download laufen in
-Hintergrund-Threads und melden sich über eine `queue.Queue` zurück, die die GUI
-alle 100 ms leert. Tkinter-Widgets dürfen ausschließlich aus dem Hauptthread
-angefasst werden — sonst gibt es sporadische Abstürze.
+**Important for development:** search and download run in background
+threads and report back through a `queue.Queue` that the GUI empties every
+100 ms. Tkinter widgets must only be touched from the main thread –
+otherwise you get random crashes.
 
 ---
 
-## Hinweise
+## Notes
 
-Das Programm braucht eine Internetverbindung.
+The app needs an internet connection.
 
-Nutze die Software nur für Inhalte, zu deren Download du berechtigt bist, und
-beachte das Urheberrecht sowie die Nutzungsbedingungen der jeweiligen Seite.
+Only download content you have the right to download, and respect copyright
+law and the terms of service of the website.

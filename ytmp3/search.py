@@ -8,6 +8,7 @@ collect several hundred links in a few seconds.
 
 from __future__ import annotations
 
+import datetime
 import math
 import re
 import threading
@@ -17,6 +18,7 @@ from typing import Callable, Iterable, Sequence
 import yt_dlp
 
 from .models import ProgressEvent, Track
+from .tools import base_options
 
 EventSink = Callable[[ProgressEvent], None] | None
 
@@ -27,6 +29,8 @@ _ID_PATTERNS = (
 )
 
 _MAX_PER_PHRASE = 200
+# A free-text search has only one phrase, so it may dig deeper.
+_MAX_SINGLE_PHRASE = 1000
 
 
 class _QuietLogger:
@@ -57,6 +61,7 @@ def extract_video_id(text: str) -> str | None:
 
 def _flat_options() -> dict:
     return {
+        **base_options(),
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
@@ -66,6 +71,12 @@ def _flat_options() -> dict:
         "noplaylist": True,
         "logger": _QuietLogger(),
     }
+
+
+def expand_placeholders(phrase: str) -> str:
+    """Replace {year} / {last_year} in a search phrase."""
+    year = datetime.date.today().year
+    return phrase.replace("{year}", str(year)).replace("{last_year}", str(year - 1))
 
 
 def _keep(track: Track, min_duration: int, max_duration: int) -> bool:
@@ -79,9 +90,9 @@ def _keep(track: Track, min_duration: int, max_duration: int) -> bool:
     return True
 
 
-def search_phrase(phrase: str, limit: int) -> list[Track]:
+def search_phrase(phrase: str, limit: int, cap: int = _MAX_PER_PHRASE) -> list[Track]:
     """Run a single ``ytsearchN:`` query and return its entries as Tracks."""
-    limit = max(1, min(limit, _MAX_PER_PHRASE))
+    limit = max(1, min(limit, cap))
     query = f"ytsearch{limit}:{phrase}"
     with yt_dlp.YoutubeDL(_flat_options()) as ydl:
         info = ydl.extract_info(query, download=False)
@@ -106,31 +117,35 @@ def search_category(
 ) -> list[Track]:
     """Collect up to ``target`` unique tracks spread over ``phrases``.
 
-    Each phrase gets a share of the target plus a buffer, because duplicates
-    and filtered videos eat into the result. The loop stops early once the
-    target is reached, so unused phrases simply cost nothing.
+    Pass 1 walks through the phrases and sizes each request by the yield seen
+    so far: if the length filter or duplicates throw away most results (long
+    DJ sets in "techno", for example), later phrases are asked for more.
+    Pass 2 only runs when the target is still not reached and asks each
+    phrase again for its maximum. The loop stops as soon as the target is
+    reached, so unused phrases cost nothing.
     """
-    phrases = [p for p in phrases if p.strip()]
+    phrases = [expand_placeholders(p.strip()) for p in phrases if p.strip()]
     if not phrases or target <= 0:
         return []
 
-    per_phrase = max(10, math.ceil(target / len(phrases) * 1.6))
+    cap = _MAX_PER_PHRASE if len(phrases) > 1 else _MAX_SINGLE_PHRASE
     found: list[Track] = []
     seen: set[str] = set()
+    requested: dict[str, int] = {}
+    fetched = 0
+    kept = 0
 
-    for index, phrase in enumerate(phrases, start=1):
-        if cancel is not None and cancel.is_set():
-            break
-        if len(found) >= target:
-            break
-
+    def run(phrase: str, limit: int, step: int, label: str) -> None:
+        nonlocal fetched, kept
+        requested[phrase] = limit
         try:
-            results = search_phrase(phrase, per_phrase)
+            results = search_phrase(phrase, limit, cap)
         except Exception as exc:  # network hiccup, extractor change, ...
             _emit(on_event, ProgressEvent(
-                kind="log", message=f"Suche fehlgeschlagen für '{phrase}': {exc}"))
+                kind="log", message=f"Search failed for '{phrase}': {exc}"))
             results = []
 
+        fetched += len(results)
         new = 0
         for track in results:
             if len(found) >= target:
@@ -140,15 +155,39 @@ def search_category(
             seen.add(track.video_id)
             found.append(track)
             new += 1
+        kept += new
 
         _emit(on_event, ProgressEvent(
             kind="search_step",
-            message=f"{phrase} (+{new})",
-            current=index,
+            message=f"{label}{phrase} (+{new})",
+            current=step,
             total=len(phrases),
             percent=min(100.0, len(found) / target * 100),
             payload=len(found),
         ))
+
+    def stopped() -> bool:
+        return len(found) >= target or (cancel is not None and cancel.is_set())
+
+    # Pass 1
+    for index, phrase in enumerate(phrases):
+        if stopped():
+            break
+        missing = target - len(found)
+        phrases_left = len(phrases) - index
+        # Assume half of the results survive until there is real data.
+        rate = kept / fetched if fetched >= 20 else 0.5
+        rate = max(rate, 0.1)
+        limit = math.ceil(missing / phrases_left / rate * 1.2)
+        run(phrase, max(20, min(limit, cap)), index + 1, "")
+
+    # Pass 2
+    for index, phrase in enumerate(phrases):
+        if stopped():
+            break
+        if requested.get(phrase, 0) >= cap:
+            continue
+        run(phrase, cap, index + 1, "more: ")
 
     return found
 
@@ -176,7 +215,7 @@ def resolve_urls(
         return []
 
     def fetch(video_id: str) -> Track:
-        fallback = Track(video_id=video_id, title=f"(Titel unbekannt) {video_id}")
+        fallback = Track(video_id=video_id, title=f"(unknown title) {video_id}")
         if cancel is not None and cancel.is_set():
             return fallback
         try:
@@ -207,7 +246,7 @@ def resolve_urls(
 
 
 def _cli() -> None:
-    """Quick test without the GUI:  python -m ytmp3.search Techno 30"""
+    """Search without the GUI:  python -m ytmp3.search Techno 30"""
     import sys
 
     from .config import load_categories, load_settings
@@ -219,7 +258,7 @@ def _cli() -> None:
         pass
 
     if len(sys.argv) < 2:
-        print("Usage: python -m ytmp3.search <Kategorie|Suchbegriff> [Anzahl]")
+        print("Usage: python -m ytmp3.search <category|search term> [count]")
         raise SystemExit(1)
 
     name = sys.argv[1]
@@ -229,7 +268,7 @@ def _cli() -> None:
 
     def show(event: ProgressEvent) -> None:
         if event.kind == "search_step":
-            print(f"[{event.current}/{event.total}] {event.message} -> {event.payload} gesamt")
+            print(f"[{event.current}/{event.total}] {event.message} -> {event.payload} total")
         else:
             print(event.message)
 
@@ -241,7 +280,7 @@ def _cli() -> None:
         max_duration=settings.max_duration,
         on_event=show,
     )
-    print(f"\n{len(tracks)} Treffer:\n")
+    print(f"\n{len(tracks)} results:\n")
     for track in tracks:
         print(f"{track.duration_text:>8}  {track.title}  [{track.uploader}]")
 

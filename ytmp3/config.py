@@ -20,15 +20,17 @@ FAILED_LOG = LOG_DIR / "failed.log"
 
 # Category -> search phrases. More phrases means more unique hits, which is
 # what makes 300-500 links per category possible without duplicates.
+# {year} and {last_year} are replaced with the current/previous year when
+# searching, so "charts {year}" never goes stale.
 DEFAULT_CATEGORIES: dict[str, list[str]] = {
     "Pop": [
-        "pop hits 2025", "top pop songs", "pop music playlist", "best pop songs 2024",
+        "pop hits {year}", "top pop songs", "pop music playlist", "best pop songs {last_year}",
         "pop charts", "deutsche pop songs", "pop remix", "radio pop hits",
         "pop anthems", "female pop singers hits",
     ],
     "Party": [
-        "party hits", "party mix 2025", "partyschlager", "party anthems",
-        "mallorca party hits", "club party mix", "party remix 2024",
+        "party hits", "party mix {year}", "partyschlager", "party anthems",
+        "mallorca party hits", "club party mix", "party remix {last_year}",
         "apres ski hits", "party classics", "feiern songs",
     ],
     "Disco": [
@@ -37,50 +39,50 @@ DEFAULT_CATEGORIES: dict[str, list[str]] = {
         "studio 54 disco", "disco dance hits",
     ],
     "Techno": [
-        "techno 2025", "hard techno set", "melodic techno", "techno remix",
+        "techno {year}", "hard techno set", "melodic techno", "techno remix",
         "techno anthems", "minimal techno", "berlin techno", "acid techno",
-        "techno festival", "techno hits 2024",
+        "techno festival", "techno hits {last_year}",
     ],
     "House": [
-        "house music 2025", "deep house mix", "tech house", "future house",
-        "house classics", "afro house", "melodic house", "house remix 2024",
+        "house music {year}", "deep house mix", "tech house", "future house",
+        "house classics", "afro house", "melodic house", "house remix {last_year}",
     ],
     "Turkish": [
-        "türkçe pop", "türkçe hit şarkılar", "turkish pop 2025", "türkçe rap",
+        "türkçe pop", "türkçe hit şarkılar", "turkish pop {year}", "türkçe rap",
         "türkçe slow şarkılar", "türkçe pop remix", "halay oyun havası",
-        "türkçe hit 2024", "turkish dance music", "türkçe akustik",
+        "türkçe hit {last_year}", "turkish dance music", "türkçe akustik",
     ],
     "Arabesque": [
         "arabesk şarkılar", "arabesk mix", "müslüm gürses", "orhan gencebay",
-        "ibrahim tatlıses", "arabesk rap", "damar arabesk", "arabesk 2025",
+        "ibrahim tatlıses", "arabesk rap", "damar arabesk", "arabesk {year}",
         "arabesk slow", "ferdi tayfur",
     ],
     "Arabic": [
         "arabic pop songs", "aghani arabiya", "arabic dance music",
-        "khaleeji songs", "arabic remix 2025", "amr diab", "arabic hits 2024",
+        "khaleeji songs", "arabic remix {year}", "amr diab", "arabic hits {last_year}",
     ],
     "Balkan": [
         "balkan hits", "narodna muzika", "balkan party mix", "serbian hits",
-        "turbo folk", "balkan remix 2025", "bosanske pjesme",
+        "turbo folk", "balkan remix {year}", "bosanske pjesme",
     ],
     "Rap / HipHop": [
-        "deutschrap 2025", "rap hits", "hip hop playlist", "german rap charts",
-        "trap music 2025", "rap remix", "old school hip hop", "deutschrap charts 2024",
+        "deutschrap {year}", "rap hits", "hip hop playlist", "german rap charts",
+        "trap music {year}", "rap remix", "old school hip hop", "deutschrap charts {last_year}",
     ],
     "80s / 90s": [
         "80s hits", "90s dance hits", "eurodance 90s", "80er hits deutsch",
         "90s pop hits", "eurodance classics", "90s club hits",
     ],
     "Charts": [
-        "top charts 2025", "aktuelle charts", "billboard hot 100 songs",
-        "charts 2024 hits", "radio charts", "top 50 songs",
+        "top charts {year}", "aktuelle charts", "billboard hot 100 songs",
+        "charts {last_year} hits", "radio charts", "top 50 songs",
     ],
     "Schlager": [
-        "schlager hits", "schlager 2025", "schlager party", "helene fischer",
+        "schlager hits", "schlager {year}", "schlager party", "helene fischer",
         "discofox schlager", "schlager classics",
     ],
     "Rock": [
-        "rock classics", "rock hits 2025", "classic rock songs",
+        "rock classics", "rock hits {year}", "classic rock songs",
         "deutsche rockmusik", "rock anthems", "alternative rock hits",
     ],
 }

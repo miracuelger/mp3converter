@@ -1,1 +1,6 @@
-yt-dlp>=2024.1.0
+# Installed automatically into .venv on the first start (see run_gui.py).
+# yt-dlp is required. The other two are optional fallbacks: an ffmpeg or deno
+# that is already installed on the system is used first.
+yt-dlp[default]>=2025.11.12
+imageio-ffmpeg>=0.5
+deno>=2.0

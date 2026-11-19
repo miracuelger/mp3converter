@@ -7,6 +7,7 @@ stays responsive with 500 rows and gives sortable columns for free.
 from __future__ import annotations
 
 import tkinter as tk
+import webbrowser
 from tkinter import ttk
 from typing import Callable, Iterable, Sequence
 
@@ -31,9 +32,9 @@ class ResultsView(ttk.Frame):
         columns = ("check", "title", "uploader", "duration")
         self.tree = ttk.Treeview(self, columns=columns, show="headings", selectmode="extended")
         self.tree.heading("check", text="", command=self.toggle_all)
-        self.tree.heading("title", text="Titel", command=lambda: self._sort("title"))
-        self.tree.heading("uploader", text="Kanal", command=lambda: self._sort("uploader"))
-        self.tree.heading("duration", text="Länge", command=lambda: self._sort("duration"))
+        self.tree.heading("title", text="Title", command=lambda: self._sort("title"))
+        self.tree.heading("uploader", text="Channel", command=lambda: self._sort("uploader"))
+        self.tree.heading("duration", text="Length", command=lambda: self._sort("duration"))
         self.tree.column("check", width=36, minwidth=36, stretch=False, anchor="center")
         self.tree.column("title", width=520, minwidth=200, stretch=True)
         self.tree.column("uploader", width=200, minwidth=120, stretch=False)
@@ -49,13 +50,16 @@ class ResultsView(ttk.Frame):
         self.tree.bind("<Button-1>", self._on_click)
         self.tree.bind("<space>", self._on_space)
         self.tree.bind("<Return>", self._on_space)
+        self.tree.bind("<Double-1>", self._on_double_click)
+        self.tree.bind("<Delete>", lambda _e: self.remove_selected_rows())
+        self.tree.bind("<Control-a>", self._select_all_rows)
 
         toolbar = ttk.Frame(self)
         toolbar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
-        ttk.Button(toolbar, text="Alle", width=8, command=lambda: self.set_all(True)).pack(side="left")
-        ttk.Button(toolbar, text="Keine", width=8, command=lambda: self.set_all(False)).pack(side="left", padx=(4, 0))
-        ttk.Button(toolbar, text="Umkehren", width=10, command=self.invert).pack(side="left", padx=(4, 0))
-        ttk.Button(toolbar, text="Entfernen", width=10, command=self.remove_selected_rows).pack(side="left", padx=(4, 0))
+        ttk.Button(toolbar, text="All", width=8, command=lambda: self.set_all(True)).pack(side="left")
+        ttk.Button(toolbar, text="None", width=8, command=lambda: self.set_all(False)).pack(side="left", padx=(4, 0))
+        ttk.Button(toolbar, text="Invert", width=10, command=self.invert).pack(side="left", padx=(4, 0))
+        ttk.Button(toolbar, text="Remove", width=10, command=self.remove_selected_rows).pack(side="left", padx=(4, 0))
 
         ttk.Label(toolbar, text="Filter:").pack(side="left", padx=(16, 4))
         self.filter_var = tk.StringVar()
@@ -63,7 +67,7 @@ class ResultsView(ttk.Frame):
         entry = ttk.Entry(toolbar, textvariable=self.filter_var, width=24)
         entry.pack(side="left")
 
-        self.count_var = tk.StringVar(value="0 Treffer, 0 ausgewählt")
+        self.count_var = tk.StringVar(value="0 results, 0 selected")
         ttk.Label(toolbar, textvariable=self.count_var).pack(side="right")
 
     # ------------------------------------------------------------------ data
@@ -136,9 +140,9 @@ class ResultsView(ttk.Frame):
     def _update_count(self) -> None:
         selected = sum(1 for t in self._tracks if t.selected)
         visible = len(self._visible_tracks())
-        text = f"{len(self._tracks)} Treffer, {selected} ausgewählt"
+        text = f"{len(self._tracks)} results, {selected} selected"
         if visible != len(self._tracks):
-            text = f"{visible} gefiltert · {text}"
+            text = f"{visible} shown · {text}"
         self.count_var.set(text)
         if self._on_change is not None:
             self._on_change()
@@ -195,6 +199,23 @@ class ResultsView(ttk.Frame):
     def _on_space(self, _event: tk.Event) -> str:
         for row in self.tree.selection():
             self._toggle(row)
+        return "break"
+
+    def _on_double_click(self, event: tk.Event) -> str | None:
+        """Double-click on a title opens the video in the web browser."""
+        if self.tree.identify_region(event.x, event.y) != "cell":
+            return None
+        if self.tree.identify_column(event.x) == "#1":
+            return None  # fast clicking on the check box is just toggling
+        row = self.tree.identify_row(event.y)
+        track = self._by_id.get(row)
+        if track is not None:
+            webbrowser.open(track.url)
+            return "break"
+        return None
+
+    def _select_all_rows(self, _event: tk.Event) -> str:
+        self.tree.selection_set(self.tree.get_children())
         return "break"
 
     def _sort(self, column: str) -> None:

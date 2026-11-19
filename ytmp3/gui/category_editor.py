@@ -13,7 +13,7 @@ class CategoryEditor(tk.Toplevel):
 
     def __init__(self, master: tk.Misc, categories: dict[str, list[str]]) -> None:
         super().__init__(master)
-        self.title("Kategorien bearbeiten")
+        self.title("Edit categories")
         self.geometry("720x460")
         self.minsize(600, 380)
         self.transient(master)
@@ -34,11 +34,11 @@ class CategoryEditor(tk.Toplevel):
         self.listbox.grid(row=0, column=0, columnspan=2, sticky="ns")
         self.listbox.bind("<<ListboxSelect>>", self._on_select)
 
-        ttk.Button(left, text="Neu", command=self._add).grid(
+        ttk.Button(left, text="New", command=self._add).grid(
             row=1, column=0, sticky="ew", pady=(8, 0))
-        ttk.Button(left, text="Löschen", command=self._delete).grid(
+        ttk.Button(left, text="Delete", command=self._delete).grid(
             row=1, column=1, sticky="ew", pady=(8, 0), padx=(4, 0))
-        ttk.Button(left, text="Umbenennen", command=self._rename).grid(
+        ttk.Button(left, text="Rename", command=self._rename).grid(
             row=2, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # --- right: phrases of the selected category
@@ -49,8 +49,9 @@ class CategoryEditor(tk.Toplevel):
 
         ttk.Label(
             right,
-            text="Suchbegriffe – ein Begriff pro Zeile. Je mehr Begriffe, "
-                 "desto mehr verschiedene Treffer.",
+            text="Search terms – one per line. More terms give more different "
+                 "results. {year} and {last_year} are replaced with the current "
+                 "and the previous year.",
             wraplength=430,
             justify="left",
         ).grid(row=0, column=0, sticky="w", pady=(0, 6))
@@ -69,10 +70,10 @@ class CategoryEditor(tk.Toplevel):
         # --- bottom buttons
         bottom = ttk.Frame(self, padding=(10, 0, 10, 10))
         bottom.grid(row=1, column=0, columnspan=2, sticky="ew")
-        ttk.Button(bottom, text="Standard-Kategorien ergänzen",
+        ttk.Button(bottom, text="Add default categories",
                    command=self._restore_defaults).pack(side="left")
-        ttk.Button(bottom, text="Abbrechen", command=self._cancel).pack(side="right")
-        ttk.Button(bottom, text="Speichern", command=self._save).pack(side="right", padx=(0, 6))
+        ttk.Button(bottom, text="Cancel", command=self._cancel).pack(side="right")
+        ttk.Button(bottom, text="Save", command=self._save).pack(side="right", padx=(0, 6))
 
         self._reload_list(select_first=True)
         self.protocol("WM_DELETE_WINDOW", self._cancel)
@@ -124,14 +125,14 @@ class CategoryEditor(tk.Toplevel):
     # --------------------------------------------------------------- actions
 
     def _add(self) -> None:
-        name = simpledialog.askstring("Neue Kategorie", "Name:", parent=self)
+        name = simpledialog.askstring("New category", "Name:", parent=self)
         if not name:
             return
         name = name.strip()
         if not name:
             return
         if name in self._categories:
-            messagebox.showinfo("Kategorie", f"'{name}' gibt es bereits.", parent=self)
+            messagebox.showinfo("Category", f"'{name}' already exists.", parent=self)
             return
         self._store_current()
         self._categories[name] = []
@@ -142,12 +143,12 @@ class CategoryEditor(tk.Toplevel):
         if self._current is None:
             return
         old = self._current
-        name = simpledialog.askstring("Umbenennen", "Neuer Name:", initialvalue=old, parent=self)
+        name = simpledialog.askstring("Rename", "New name:", initialvalue=old, parent=self)
         if not name or not name.strip() or name.strip() == old:
             return
         name = name.strip()
         if name in self._categories:
-            messagebox.showinfo("Kategorie", f"'{name}' gibt es bereits.", parent=self)
+            messagebox.showinfo("Category", f"'{name}' already exists.", parent=self)
             return
         self._store_current()
         self._categories[name] = self._categories.pop(old)
@@ -157,7 +158,7 @@ class CategoryEditor(tk.Toplevel):
     def _delete(self) -> None:
         if self._current is None:
             return
-        if not messagebox.askyesno("Löschen", f"Kategorie '{self._current}' löschen?", parent=self):
+        if not messagebox.askyesno("Delete", f"Delete the category '{self._current}'?", parent=self):
             return
         self._categories.pop(self._current, None)
         self._current = None
@@ -172,7 +173,7 @@ class CategoryEditor(tk.Toplevel):
                 self._categories[name] = list(phrases)
                 added += 1
         self._reload_list(select=self._current, select_first=True)
-        messagebox.showinfo("Standard", f"{added} Kategorie(n) ergänzt.", parent=self)
+        messagebox.showinfo("Defaults", f"{added} category(ies) added.", parent=self)
 
     def _save(self) -> None:
         self._store_current()
@@ -180,19 +181,19 @@ class CategoryEditor(tk.Toplevel):
         dropped = len(self._categories) - len(cleaned)
         if not cleaned:
             messagebox.showwarning(
-                "Speichern", "Mindestens eine Kategorie mit Suchbegriffen wird gebraucht.",
+                "Save", "At least one category with search terms is needed.",
                 parent=self)
             return
         if dropped and not messagebox.askyesno(
-            "Speichern",
-            f"{dropped} Kategorie(n) ohne Suchbegriffe werden verworfen. Fortfahren?",
+            "Save",
+            f"{dropped} category(ies) without search terms will be discarded. Continue?",
             parent=self,
         ):
             return
         try:
             save_categories(cleaned)
         except OSError as exc:
-            messagebox.showerror("Speichern", f"Konnte nicht speichern: {exc}", parent=self)
+            messagebox.showerror("Save", f"Could not save: {exc}", parent=self)
             return
         self.result = cleaned
         self.grab_release()

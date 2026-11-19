@@ -1,9 +1,9 @@
 {
   "Pop": [
-    "pop hits 2025",
+    "pop hits {year}",
     "top pop songs",
     "pop music playlist",
-    "best pop songs 2024",
+    "best pop songs {last_year}",
     "pop charts",
     "deutsche pop songs",
     "pop remix",
@@ -13,12 +13,12 @@
   ],
   "Party": [
     "party hits",
-    "party mix 2025",
+    "party mix {year}",
     "partyschlager",
     "party anthems",
     "mallorca party hits",
     "club party mix",
-    "party remix 2024",
+    "party remix {last_year}",
     "apres ski hits",
     "party classics",
     "feiern songs"
@@ -36,7 +36,7 @@
     "disco dance hits"
   ],
   "Techno": [
-    "techno 2025",
+    "techno {year}",
     "hard techno set",
     "melodic techno",
     "techno remix",
@@ -45,27 +45,27 @@
     "berlin techno",
     "acid techno",
     "techno festival",
-    "techno hits 2024"
+    "techno hits {last_year}"
   ],
   "House": [
-    "house music 2025",
+    "house music {year}",
     "deep house mix",
     "tech house",
     "future house",
     "house classics",
     "afro house",
     "melodic house",
-    "house remix 2024"
+    "house remix {last_year}"
   ],
   "Turkish": [
     "türkçe pop",
     "türkçe hit şarkılar",
-    "turkish pop 2025",
+    "turkish pop {year}",
     "türkçe rap",
     "türkçe slow şarkılar",
     "türkçe pop remix",
     "halay oyun havası",
-    "türkçe hit 2024",
+    "türkçe hit {last_year}",
     "turkish dance music",
     "türkçe akustik"
   ],
@@ -77,7 +77,7 @@
     "ibrahim tatlıses",
     "arabesk rap",
     "damar arabesk",
-    "arabesk 2025",
+    "arabesk {year}",
     "arabesk slow",
     "ferdi tayfur"
   ],
@@ -86,9 +86,9 @@
     "aghani arabiya",
     "arabic dance music",
     "khaleeji songs",
-    "arabic remix 2025",
+    "arabic remix {year}",
     "amr diab",
-    "arabic hits 2024"
+    "arabic hits {last_year}"
   ],
   "Balkan": [
     "balkan hits",
@@ -96,18 +96,18 @@
     "balkan party mix",
     "serbian hits",
     "turbo folk",
-    "balkan remix 2025",
+    "balkan remix {year}",
     "bosanske pjesme"
   ],
   "Rap / HipHop": [
-    "deutschrap 2025",
+    "deutschrap {year}",
     "rap hits",
     "hip hop playlist",
     "german rap charts",
-    "trap music 2025",
+    "trap music {year}",
     "rap remix",
     "old school hip hop",
-    "deutschrap charts 2024"
+    "deutschrap charts {last_year}"
   ],
   "80s / 90s": [
     "80s hits",
@@ -119,16 +119,16 @@
     "90s club hits"
   ],
   "Charts": [
-    "top charts 2025",
+    "top charts {year}",
     "aktuelle charts",
     "billboard hot 100 songs",
-    "charts 2024 hits",
+    "charts {last_year} hits",
     "radio charts",
     "top 50 songs"
   ],
   "Schlager": [
     "schlager hits",
-    "schlager 2025",
+    "schlager {year}",
     "schlager party",
     "helene fischer",
     "discofox schlager",
@@ -136,7 +136,7 @@
   ],
   "Rock": [
     "rock classics",
-    "rock hits 2025",
+    "rock hits {year}",
     "classic rock songs",
     "deutsche rockmusik",
     "rock anthems",
