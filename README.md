@@ -3,6 +3,8 @@
 Pick a category → 100–500 matching YouTube links are found automatically →
 choose the ones you want → download them as MP3.
 
+![The main window after searching the "80s / 90s" category: 60 results, 4 of them unticked](docs/screenshot.png)
+
 | | |
 |---|---|
 | **Search** | Several search terms per category; duplicates and live streams are filtered out |
@@ -120,6 +122,7 @@ Arabesque · Arabic · Balkan · Rap/HipHop · 80s/90s · Charts · Schlager · 
 |---|---|
 | The start script says Python was not found | Install Python 3.10+ (see *Installation*) and start again |
 | "tkinter is missing" | Linux: `sudo apt install python3-tk` (Debian/Ubuntu) |
+| Linux: `[x]` instead of check boxes, `?` in some titles | Your Python (e.g. installed with uv, mise or pyenv) has a Tk without modern font support. Downloads work normally. For nicer text, start with the system Python (`/usr/bin/python3 run_gui.py`) after deleting the `.venv` folder |
 | Many failed downloads, HTTP 429 | Lower *Parallel* to 1–2 |
 | Many failed downloads after a while of working fine | YouTube changed something: run `python run_gui.py --update` |
 | Only hour-long mixes in the list | Lower the maximum length, e.g. to 600 sec |

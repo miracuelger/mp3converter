@@ -49,7 +49,7 @@ class CategoryEditor(tk.Toplevel):
 
         ttk.Label(
             right,
-            text="Search terms – one per line. More terms give more different "
+            text="Search terms - one per line. More terms give more different "
                  "results. {year} and {last_year} are replaced with the current "
                  "and the previous year.",
             wraplength=430,

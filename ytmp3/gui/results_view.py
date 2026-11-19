@@ -15,6 +15,37 @@ from ..models import Track
 
 CHECKED = "☑"
 UNCHECKED = "☐"
+# Fallbacks for Tk builds without Xft (see has_basic_fonts).
+CHECKED_ASCII = "[x]"
+UNCHECKED_ASCII = "[ ]"
+
+# Typographic characters that often appear in YouTube titles, mapped to
+# Latin-1 look-alikes that every font can draw.
+_LATIN1_LOOKALIKES = str.maketrans({
+    "\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201b": "'",
+    "\u201c": '"', "\u201d": '"', "\u201e": '"',
+    "\u2013": "-", "\u2014": "-", "\u2015": "-", "\u2212": "-",
+    "\u2026": "...", "\u2022": "\u00b7", "\u00a0": " ",
+})
+
+
+def has_basic_fonts(widget: tk.Misc) -> bool:
+    """True if Tk can only draw Latin-1 characters.
+
+    Some Python builds for Linux (python-build-standalone, used by uv, mise,
+    rye ...) ship a Tk without Xft. It uses old X11 core fonts that cannot
+    draw characters such as the check boxes, so they appear as garbage.
+    """
+    try:
+        return str(widget.tk.call("::tk::pkgconfig", "get", "fontsystem")) == "x11"
+    except tk.TclError:  # Windows/macOS builds have no such key
+        return False
+
+
+def latin1_text(text: str) -> str:
+    """Replace characters a Latin-1 core font cannot draw."""
+    text = text.translate(_LATIN1_LOOKALIKES)
+    return "".join(ch if ord(ch) < 256 else "?" for ch in text)
 
 
 class ResultsView(ttk.Frame):
@@ -25,6 +56,9 @@ class ResultsView(ttk.Frame):
         self._on_change = on_change
         self._sort_column: str | None = None
         self._sort_reverse = False
+        self.basic_fonts = has_basic_fonts(self)
+        self._checked = CHECKED_ASCII if self.basic_fonts else CHECKED
+        self._unchecked = UNCHECKED_ASCII if self.basic_fonts else UNCHECKED
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
@@ -35,7 +69,7 @@ class ResultsView(ttk.Frame):
         self.tree.heading("title", text="Title", command=lambda: self._sort("title"))
         self.tree.heading("uploader", text="Channel", command=lambda: self._sort("uploader"))
         self.tree.heading("duration", text="Length", command=lambda: self._sort("duration"))
-        self.tree.column("check", width=36, minwidth=36, stretch=False, anchor="center")
+        self.tree.column("check", width=40, minwidth=40, stretch=False, anchor="center")
         self.tree.column("title", width=520, minwidth=200, stretch=True)
         self.tree.column("uploader", width=200, minwidth=120, stretch=False)
         self.tree.column("duration", width=80, minwidth=60, stretch=False, anchor="e")
@@ -120,12 +154,14 @@ class ResultsView(ttk.Frame):
             )
         self._update_count()
 
-    @staticmethod
-    def _row(track: Track) -> tuple[str, str, str, str]:
+    def _row(self, track: Track) -> tuple[str, str, str, str]:
+        title, uploader = track.title, track.uploader
+        if self.basic_fonts:
+            title, uploader = latin1_text(title), latin1_text(uploader)
         return (
-            CHECKED if track.selected else UNCHECKED,
-            track.title,
-            track.uploader,
+            self._checked if track.selected else self._unchecked,
+            title,
+            uploader,
             track.duration_text,
         )
 

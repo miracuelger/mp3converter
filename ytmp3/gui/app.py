@@ -77,6 +77,11 @@ class App(tk.Tk):
         if not has_js_runtime():
             self._log("No JavaScript runtime (Deno) found - some videos may fail to download. "
                       "Start the app with the start script to install it automatically.")
+        if self.results.basic_fonts:
+            self._log("Note: this Python's Tk has limited font support, so some special "
+                      "characters in titles are shown as '?'. Downloads are not affected. "
+                      "For nicer text use your system's Python (e.g. python3-tk) - delete "
+                      "the .venv folder after switching.")
         self._log("Ready. Pick a category (or type your own search term) and click 'Search'.")
 
     # -------------------------------------------------------------------- UI
@@ -123,10 +128,10 @@ class App(tk.Tk):
         self.search_button = ttk.Button(top, text="Search", command=self.start_search)
         self.search_button.grid(row=0, column=4)
 
-        self.category_button = ttk.Button(top, text="Categories…", command=self.edit_categories)
+        self.category_button = ttk.Button(top, text="Categories...", command=self.edit_categories)
         self.category_button.grid(row=0, column=5, padx=(6, 0))
 
-        self.import_button = ttk.Button(top, text="Links from file…", command=self.import_links)
+        self.import_button = ttk.Button(top, text="Links from file...", command=self.import_links)
         self.import_button.grid(row=0, column=6, padx=(6, 0))
 
         self.paste_button = ttk.Button(top, text="Paste links", command=self.paste_links)
@@ -146,7 +151,7 @@ class App(tk.Tk):
         self.output_var = tk.StringVar(value=self.settings.output_dir)
         ttk.Entry(bottom, textvariable=self.output_var).grid(
             row=0, column=1, sticky="ew", padx=(6, 6))
-        ttk.Button(bottom, text="Browse…", command=self.choose_folder).grid(row=0, column=2)
+        ttk.Button(bottom, text="Browse...", command=self.choose_folder).grid(row=0, column=2)
         ttk.Button(bottom, text="Open", command=self.open_folder).grid(
             row=0, column=3, padx=(6, 0))
 
@@ -189,7 +194,7 @@ class App(tk.Tk):
         ttk.Label(progress, text="Current:").grid(row=0, column=0, sticky="w")
         self.file_bar = ttk.Progressbar(progress, maximum=100)
         self.file_bar.grid(row=0, column=1, sticky="ew", padx=(6, 6))
-        self.file_label = ttk.Label(progress, text="–", width=44, anchor="w")
+        self.file_label = ttk.Label(progress, text="-", width=44, anchor="w")
         self.file_label.grid(row=0, column=2, sticky="w")
 
         ttk.Label(progress, text="Total:").grid(row=1, column=0, sticky="w", pady=(4, 0))
@@ -284,13 +289,13 @@ class App(tk.Tk):
         self.worker.start()
 
     def _sink(self, event: ProgressEvent) -> None:
-        """Called from worker threads – only touches the queue."""
+        """Called from worker threads - only touches the queue."""
         self.events.put(event)
 
     def _reset_progress(self, total_text: str) -> None:
         self.total_bar.configure(value=0)
         self.total_label.configure(text=total_text)
-        self.file_label.configure(text="–")
+        self.file_label.configure(text="-")
         self.file_bar.configure(value=0)
 
     # --------------------------------------------------------------- actions
@@ -333,7 +338,7 @@ class App(tk.Tk):
 
         target = self.settings.target_count
         self._log(f"Searching {what}: up to {target} links using "
-                  f"{len(phrases)} search term(s)…")
+                  f"{len(phrases)} search term(s)...")
         self._reset_progress(f"0 / {target}")
         self._save_settings_quietly()
 
@@ -392,7 +397,7 @@ class App(tk.Tk):
                           "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
             return
 
-        self._log(f"Importing {len(valid)} link(s) from {source} – fetching titles…")
+        self._log(f"Importing {len(valid)} link(s) from {source} - fetching titles...")
         self._reset_progress(f"0 / {len(valid)}")
 
         def job() -> None:
@@ -431,7 +436,7 @@ class App(tk.Tk):
 
         self._save_settings_quietly()
         self._log(f"Downloading {len(tracks)} track(s) to {output_dir} "
-                  f"({self.settings.bitrate} kbps, {self.settings.concurrency} in parallel)…")
+                  f"({self.settings.bitrate} kbps, {self.settings.concurrency} in parallel)...")
         self._reset_progress(f"0 / {len(tracks)}")
 
         settings = self.settings
@@ -450,7 +455,7 @@ class App(tk.Tk):
             return
         self.cancel_event.set()
         self.cancel_button.configure(state="disabled")
-        self._log("Cancelling…")
+        self._log("Cancelling...")
 
     def edit_categories(self) -> None:
         editor = CategoryEditor(self, self.categories)
@@ -533,7 +538,7 @@ class App(tk.Tk):
 
     def _finish_search(self, tracks: list[Track], append: bool) -> None:
         self._set_busy(False)
-        self.file_label.configure(text="–")
+        self.file_label.configure(text="-")
         self.file_bar.configure(value=0)
 
         if append:
@@ -558,7 +563,7 @@ class App(tk.Tk):
         self._set_busy(False)
         summary = event.payload
         self.file_bar.configure(value=0)
-        self.file_label.configure(text="–")
+        self.file_label.configure(text="-")
 
         if summary is None:
             return
